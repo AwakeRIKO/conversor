@@ -1,7 +1,7 @@
+import os
 import pdfplumber
 import pandas as pd
 import re
-import os
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 from flask import Flask, request, send_file, render_template
@@ -94,8 +94,16 @@ def upload_file():
         excel_filename = filename.replace('.pdf', '.xlsx')
         excel_path = os.path.join(app.config['UPLOAD_FOLDER'], excel_filename)
         create_excel(transactions, excel_path)
+
+        # Excluir o arquivo PDF após a conversão
+        try:
+            os.remove(pdf_path)
+        except Exception as e:
+            print(f"Erro ao excluir o arquivo PDF: {str(e)}")
+
         return send_file(excel_path, as_attachment=True)
     return 'Tipo de arquivo não permitido', 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
