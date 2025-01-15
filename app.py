@@ -77,6 +77,11 @@ def allowed_file(filename):
 def index():
     return render_template('index.html')
 
+# Nova rota adicionada para a página excel.html
+@app.route('/excel', methods=['GET'])
+def excel():
+    return render_template('excel.html')
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
