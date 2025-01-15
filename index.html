@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor PDF</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .card-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            width: 200px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: #ffc107;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .card-description {
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .card a {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #ffc107;
+            color: #000;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .card a:hover {
+            background-color: #e0a800;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Conversor PDF</h1>
+        <div class="card-container">
+            <div class="card">
+                <div class="card-icon">📄</div>
+                <div class="card-title">PDF para Excel</div>
+                <div class="card-description">Converta arquivos PDF em planilhas Excel.</div>
+                <a href="/upload">Converter</a>
+            </div>
+            <div class="card">
+                <div class="card-icon">🖼️</div>
+                <div class="card-title">Imagem para PDF</div>
+                <div class="card-description">Converta imagens (PNG, JPEG, GIF) em PDF.</div>
+                <a href="#">Converter</a>
+            </div>
+            <div class="card">
+                <div class="card-icon">📂</div>
+                <div class="card-title">Ficheiro para PDF</div>
+                <div class="card-description">Converta qualquer ficheiro em PDF.</div>
+                <a href="#">Converter</a>
+            </div>
+            <div class="card">
+                <div class="card-icon">🌐</div>
+                <div class="card-title">Site para PDF</div>
+                <div class="card-description">Converta páginas da internet em PDF.</div>
+                <a href="#">Converter</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
