@@ -15,14 +15,17 @@ def extract_transactions_from_pdf(pdf_path):
         with pdfplumber.open(pdf_path) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
-                lines = text.split('\n')
-                for line in lines:
-                    # Ajuste na expressão regular para capturar descrição antes do ID
-                    match = re.search(r'(\d{2}-\d{2}-\d{4})\s+(.+?)\s+\d{11}\s+R\$ ([\d\.,-]+)', line)
-                    if match:
-                        date, description, value = match.groups()
-                        value = float(value.replace('.', '').replace(',', '.').strip())
-                        transactions.append({'Data': date, 'Descrição': description.strip(), 'Valor': value})
+                # Pré-processar o texto para remover quebras de linha e espaços extras
+                text = re.sub(r'\s+', ' ', text)
+                # Regex ajustada para capturar transações com ou sem ID de operação
+                matches = re.findall(
+                    r'(\d{2}-\d{2}-\d{4})\s+(.+?)\s+(?:\d{11}\s+)?R\$ ([\d\.,-]+)',
+                    text
+                )
+                for match in matches:
+                    date, description, value = match
+                    value = float(value.replace('.', '').replace(',', '.').strip())
+                    transactions.append({'Data': date, 'Descrição': description.strip(), 'Valor': value})
         return transactions
     except Exception as e:
         print(f"Erro ao processar o PDF {pdf_path}: {str(e)}")
