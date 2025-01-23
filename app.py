@@ -7,7 +7,6 @@ from openpyxl.styles import Alignment
 from flask import Flask, request, send_file, render_template
 from werkzeug.utils import secure_filename
 
-# Funções do código atualizado
 def extract_transactions_from_pdf(pdf_path):
     """Extrai as transações do PDF e organiza em colunas com a descrição correta."""
     transactions = []
@@ -15,17 +14,36 @@ def extract_transactions_from_pdf(pdf_path):
         with pdfplumber.open(pdf_path) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
-                # Pré-processar o texto para remover quebras de linha e espaços extras
-                text = re.sub(r'\s+', ' ', text)
-                # Regex ajustada para capturar Data, Descrição e Valor (ignorando o ID)
-                matches = re.findall(
-                    r'(\d{2}-\d{2}-\d{4})\s+(.+?)\s+R\$ ([\d\.,-]+)',
-                    text
-                )
-                for match in matches:
-                    date, description, value = match
-                    value = float(value.replace('.', '').replace(',', '.').strip())
-                    transactions.append({'Data': date, 'Descrição': description.strip(), 'Valor': value})
+                lines = text.split('\n')
+                current_date = None
+                current_description = None
+                for line in lines:
+                    # Procurar por data
+                    date_match = re.search(r'(\d{2}-\d{2}-\d{4})', line)
+                    if date_match:
+                        current_date = date_match.group(1)
+                        current_description = None
+                        continue
+
+                    # Procurar por descrição
+                    if current_date and not current_description:
+                        description_match = re.search(r'^\s*(.+?)\s*$', line)
+                        if description_match:
+                            current_description = description_match.group(1).strip()
+                            continue
+
+                    # Procurar por valor
+                    value_match = re.search(r'R\$\s*([\d\.,-]+)', line)
+                    if value_match and current_date and current_description:
+                        value = value_match.group(1)
+                        value = float(value.replace('.', '').replace(',', '.').strip())
+                        transactions.append({
+                            'Data': current_date,
+                            'Descrição': current_description,
+                            'Valor': value
+                        })
+                        current_date = None
+                        current_description = None
         return transactions
     except Exception as e:
         print(f"Erro ao processar o PDF {pdf_path}: {str(e)}")
@@ -64,7 +82,6 @@ def create_excel(transactions, excel_path):
     except Exception as e:
         print(f"Erro ao criar arquivo Excel: {str(e)}")
 
-# Código Flask
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf'}
@@ -81,7 +98,6 @@ def allowed_file(filename):
 def index():
     return render_template('index.html')
 
-# Nova rota adicionada para a página excel.html
 @app.route('/excel', methods=['GET'])
 def excel():
     return render_template('excel.html')
