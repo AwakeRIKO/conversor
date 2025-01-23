@@ -8,7 +8,7 @@ from flask import Flask, request, send_file, render_template
 from werkzeug.utils import secure_filename
 
 def extract_transactions_from_pdf(pdf_path):
-    """Extrai as transações do PDF e organiza em colunas com a descrição correta."""
+    """Extrai as transações do PDF no formato especificado."""
     transactions = []
     try:
         with pdfplumber.open(pdf_path) as pdf:
@@ -16,34 +16,24 @@ def extract_transactions_from_pdf(pdf_path):
                 text = page.extract_text()
                 lines = text.split('\n')
                 current_date = None
-                current_description = None
                 for line in lines:
                     # Procurar por data
                     date_match = re.search(r'(\d{2}-\d{2}-\d{4})', line)
                     if date_match:
                         current_date = date_match.group(1)
-                        current_description = None
                         continue
 
-                    # Procurar por descrição
-                    if current_date and not current_description:
-                        description_match = re.search(r'^\s*(.+?)\s*$', line)
-                        if description_match:
-                            current_description = description_match.group(1).strip()
-                            continue
-
-                    # Procurar por valor
-                    value_match = re.search(r'R\$\s*([\d\.,-]+)', line)
-                    if value_match and current_date and current_description:
-                        value = value_match.group(1)
-                        value = float(value.replace('.', '').replace(',', '.').strip())
-                        transactions.append({
-                            'Data': current_date,
-                            'Descrição': current_description,
-                            'Valor': value
-                        })
-                        current_date = None
-                        current_description = None
+                    # Procurar por transação
+                    if current_date:
+                        transaction_match = re.search(r'^(.*?)\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))$', line)
+                        if transaction_match:
+                            description, value = transaction_match.groups()
+                            value = float(value.replace('.', '').replace(',', '.'))
+                            transactions.append({
+                                'Data': current_date,
+                                'Descrição': description.strip(),
+                                'Valor': value
+                            })
         return transactions
     except Exception as e:
         print(f"Erro ao processar o PDF {pdf_path}: {str(e)}")
