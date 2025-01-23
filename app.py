@@ -17,7 +17,7 @@ def extract_transactions_from_pdf(pdf_path):
                 text = page.extract_text()
                 # Pré-processar o texto para remover quebras de linha e espaços extras
                 text = re.sub(r'\s+', ' ', text)
-                # Regex ajustada para capturar apenas Data, Descrição e Valor (ignorando o ID)
+                # Regex ajustada para capturar Data, Descrição e Valor (ignorando o ID)
                 matches = re.findall(
                     r'(\d{2}-\d{2}-\d{4})\s+(.+?)\s+R\$ ([\d\.,-]+)',
                     text
