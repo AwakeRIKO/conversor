@@ -7,9 +7,9 @@ from openpyxl.styles import Alignment
 from flask import Flask, request, send_file, render_template
 from werkzeug.utils import secure_filename
 
-# Funções do código original
+# Funções do código atualizado
 def extract_transactions_from_pdf(pdf_path):
-    """Extrai as transações do PDF e organiza em colunas."""
+    """Extrai as transações do PDF e organiza em colunas com a descrição correta."""
     transactions = []
     try:
         with pdfplumber.open(pdf_path) as pdf:
@@ -17,7 +17,8 @@ def extract_transactions_from_pdf(pdf_path):
                 text = page.extract_text()
                 lines = text.split('\n')
                 for line in lines:
-                    match = re.match(r'(\d{2}-\d{2}-\d{4}) (.+?) \d{11} R\$ ([\d\.,-]+)', line)
+                    # Ajuste na expressão regular para capturar descrição antes do ID
+                    match = re.search(r'(\d{2}-\d{2}-\d{4})\s+(.+?)\s+\d{11}\s+R\$ ([\d\.,-]+)', line)
                     if match:
                         date, description, value = match.groups()
                         value = float(value.replace('.', '').replace(',', '.').strip())
