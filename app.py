@@ -26,17 +26,20 @@ def extract_transactions_from_pdf(pdf_path):
 
                     # Procurar por transação
                     if current_date:
-                        # Regex para capturar descrição e valor
-                        transaction_match = re.search(r'^(.*?)\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))$', line)
+                        # Regex para capturar descrição, ID da operação, valor e saldo
+                        transaction_match = re.search(r'^(.*?)\s+(\d{11})\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))$', line)
                         if transaction_match:
-                            description, value = transaction_match.groups()
+                            description, operation_id, value, balance = transaction_match.groups()
                             value = float(value.replace('.', '').replace(',', '.'))
+                            balance = float(balance.replace('.', '').replace(',', '.'))
                             transactions.append({
                                 'Data': current_date,
                                 'Descrição': description.strip(),
-                                'Valor': value
+                                'ID da operação': operation_id,
+                                'Valor': value,
+                                'Saldo': balance
                             })
-                            print(f"Transação encontrada: {description.strip()} - {value}")  # Log para verificar a transação
+                            print(f"Transação encontrada: {description.strip()} - {value} - {balance}")  # Log para verificar a transação
         return transactions
     except Exception as e:
         print(f"Erro ao processar o PDF {pdf_path}: {str(e)}")
@@ -70,6 +73,7 @@ def create_excel(transactions, excel_path):
     try:
         df = pd.DataFrame(transactions)
         df['Valor'] = df['Valor'].map(lambda x: f"{x:,.2f}".replace('.', ','))
+        df['Saldo'] = df['Saldo'].map(lambda x: f"{x:,.2f}".replace('.', ','))
         df.to_excel(excel_path, sheet_name='Extrato', index=False)
         format_excel(excel_path)
     except Exception as e:
@@ -123,5 +127,4 @@ def upload_file():
     return 'Tipo de arquivo não permitido', 400
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    port = int(os.environ.get('
