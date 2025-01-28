@@ -21,10 +21,12 @@ def extract_transactions_from_pdf(pdf_path):
                     date_match = re.search(r'(\d{2}-\d{2}-\d{4})', line)
                     if date_match:
                         current_date = date_match.group(1)
+                        print(f"Data encontrada: {current_date}")  # Log para verificar a data
                         continue
 
                     # Procurar por transação
                     if current_date:
+                        # Regex melhorada para capturar transações com múltiplas linhas de descrição
                         transaction_match = re.search(r'^(.*?)\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))$', line)
                         if transaction_match:
                             description, value = transaction_match.groups()
@@ -34,6 +36,7 @@ def extract_transactions_from_pdf(pdf_path):
                                 'Descrição': description.strip(),
                                 'Valor': value
                             })
+                            print(f"Transação encontrada: {description.strip()} - {value}")  # Log para verificar a transação
         return transactions
     except Exception as e:
         print(f"Erro ao processar o PDF {pdf_path}: {str(e)}")
