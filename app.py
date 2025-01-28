@@ -1,130 +1,95 @@
-import os
-import pdfplumber
-import pandas as pd
-import re
-from openpyxl import load_workbook
-from openpyxl.styles import Alignment
-from flask import Flask, request, send_file, render_template
-from werkzeug.utils import secure_filename
-
 def extract_transactions_from_pdf(pdf_path):
-    """Extrai as transações do PDF no formato especificado."""
+    """Extrai as transações do PDF no formato específico do extrato."""
     transactions = []
     try:
         with pdfplumber.open(pdf_path) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 lines = text.split('\n')
-                current_date = None
-                for line in lines:
-                    # Procurar por data
-                    date_match = re.search(r'(\d{2}-\d{2}-\d{4})', line)
-                    if date_match:
-                        current_date = date_match.group(1)
-                        print(f"Data encontrada: {current_date}")  # Log para verificar a data
-                        continue
 
-                    # Procurar por transação
-                    if current_date:
-                        # Regex para capturar descrição, ID da operação, valor e saldo
-                        transaction_match = re.search(r'^(.*?)\s+(\d{11})\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))$', line)
-                        if transaction_match:
-                            description, operation_id, value, balance = transaction_match.groups()
-                            value = float(value.replace('.', '').replace(',', '.'))
-                            balance = float(balance.replace('.', '').replace(',', '.'))
-                            transactions.append({
-                                'Data': current_date,
-                                'Descrição': description.strip(),
-                                'ID da operação': operation_id,
-                                'Valor': value,
-                                'Saldo': balance
-                            })
-                            print(f"Transação encontrada: {description.strip()} - {value} - {balance}")  # Log para verificar a transação
+                # Pular o cabeçalho
+                start_index = 0
+                for i, line in enumerate(lines):
+                    if "DETALHE DOS MOVIMENTOS" in line:
+                        start_index = i + 2  # Pular a linha de cabeçalho
+                        break
+
+                current_date = None
+                for line in lines[start_index:]:
+                    # Ignorar linhas de cabeçalho e rodapé
+                    if "Data" in line and "Descrição" in line:
+                        continue
+                    if "Data de geração:" in line:
+                        break
+
+                    # Tentar extrair a data e transação
+                    parts = line.strip().split()
+                    if len(parts) >= 4:  # Garantir que há elementos suficientes
+                        # Verificar se o primeiro elemento é uma data
+                        date_pattern = r'\d{2}-\d{2}-\d{2}'
+                        if re.match(date_pattern, parts[0]):
+                            current_date = parts[0]
+
+                            # Encontrar o ID da operação (número com 11 dígitos)
+                            operation_id = None
+                            description = []
+                            value = None
+                            balance = None
+
+                            for i, part in enumerate(parts):
+                                if re.match(r'\d{11}', part):
+                                    operation_id = part
+                                    # Descrição é tudo entre a data e o ID
+                                    description = ' '.join(parts[1:i])
+                                    # Valor e saldo são os dois últimos campos com R$
+                                    for j in range(i+1, len(parts)):
+                                        if 'R$' in parts[j]:
+                                            if value is None:
+                                                value = parts[j].replace('R$', '').replace('.', '').replace(',', '.').strip()
+                                            else:
+                                                balance = parts[j].replace('R$', '').replace('.', '').replace(',', '.').strip()
+                                    break
+
+                            if operation_id and description and value and balance:
+                                try:
+                                    value = float(value)
+                                    balance = float(balance)
+                                    transactions.append({
+                                        'Data': current_date,
+                                        'Descrição': description.strip(),
+                                        'ID da operação': operation_id,
+                                        'Valor': value,
+                                        'Saldo': balance
+                                    })
+                                    print(f"Transação encontrada: {description.strip()} - {value} - {balance}")
+                                except ValueError as e:
+                                    print(f"Erro ao converter valor: {e}")
+                                    continue
+
         return transactions
     except Exception as e:
         print(f"Erro ao processar o PDF {pdf_path}: {str(e)}")
         return None
 
-def format_excel(excel_path):
-    """Ajusta o alinhamento e a largura das colunas no arquivo Excel."""
-    try:
-        workbook = load_workbook(excel_path)
-        sheet = workbook.active
-        for cell in sheet['C']:
-            cell.alignment = Alignment(horizontal='right')
-        for column in sheet.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))
-                except:
-                    pass
-            adjusted_width = max_length + 2
-            sheet.column_dimensions[column_letter].width = adjusted_width
-        workbook.save(excel_path)
-        workbook.close()
-    except Exception as e:
-        print(f"Erro ao formatar o arquivo Excel: {str(e)}")
-
 def create_excel(transactions, excel_path):
     """Cria arquivo Excel com as transações."""
     try:
         df = pd.DataFrame(transactions)
-        df['Valor'] = df['Valor'].map(lambda x: f"{x:,.2f}".replace('.', ','))
-        df['Saldo'] = df['Saldo'].map(lambda x: f"{x:,.2f}".replace('.', ','))
-        df.to_excel(excel_path, sheet_name='Extrato', index=False)
+        # Formatar valores monetários
+        df['Valor'] = df['Valor'].apply(lambda x: f"R$ {x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.'))
+        df['Saldo'] = df['Saldo'].apply(lambda x: f"R$ {x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.'))
+
+        # Criar o arquivo Excel
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Extrato', index=False)
+
+            # Ajustar largura das colunas
+            worksheet = writer.sheets['Extrato']
+            for idx, col in enumerate(df.columns):
+                max_length = max(df[col].astype(str).apply(len).max(), len(col))
+                worksheet.column_dimensions[chr(65 + idx)].width = max_length + 2
+
         format_excel(excel_path)
+
     except Exception as e:
         print(f"Erro ao criar arquivo Excel: {str(e)}")
-
-app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'pdf'}
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-@app.route('/', methods=['GET'])
-def index():
-    return render_template('index.html')
-
-@app.route('/excel', methods=['GET'])
-def excel():
-    return render_template('excel.html')
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return 'Nenhum arquivo enviado', 400
-    file = request.files['file']
-    if file.filename == '':
-        return 'Nenhum arquivo selecionado', 400
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(pdf_path)
-        transactions = extract_transactions_from_pdf(pdf_path)
-        if not transactions:
-            return 'Erro ao processar o PDF', 400
-        excel_filename = filename.replace('.pdf', '.xlsx')
-        excel_path = os.path.join(app.config['UPLOAD_FOLDER'], excel_filename)
-        create_excel(transactions, excel_path)
-
-        # Excluir o arquivo PDF após a conversão
-        try:
-            os.remove(pdf_path)
-        except Exception as e:
-            print(f"Erro ao excluir o arquivo PDF: {str(e)}")
-
-        return send_file(excel_path, as_attachment=True)
-    return 'Tipo de arquivo não permitido', 400
-
-if __name__ == '__main__':
-    port = int(os.environ.get('
