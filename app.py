@@ -26,7 +26,7 @@ def extract_transactions_from_pdf(pdf_path):
 
                     # Procurar por transação
                     if current_date:
-                        # Regex melhorada para capturar transações com múltiplas linhas de descrição
+                        # Regex para capturar descrição e valor
                         transaction_match = re.search(r'^(.*?)\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))$', line)
                         if transaction_match:
                             description, value = transaction_match.groups()
