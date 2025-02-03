@@ -41,29 +41,35 @@ def extract_transactions_from_pdf(pdf_path):
             for page in pdf.pages:
                 text = page.extract_text()
                 lines = text.split('\n')
-                current_date = None
+
+                # Padrão ajustado para o formato específico
+                transaction_pattern = re.compile(
+                    r'^(\d{2}-\d{2}-\d{4})\s+'    # Data
+                    r'(.*?)\s+'                   # Descrição (captura até o ID)
+                    r'\d{11}\s+'                  # Ignora o ID da operação
+                    r'R\$\s*(-?\d{1,3}(?:\.\d{3})*,\d{2})'  # Valor principal
+                )
 
                 for line in lines:
-                    # Procurar por data no formato DD-MM-YYYY
-                    date_match = re.search(r'(\d{2}-\d{2}-\d{4})', line)
-                    if date_match:
-                        current_date = date_match.group(1)
-                        continue
-
-                    # Procurar por transação com valor
-                    if current_date:
-                        # Padrão atualizado para capturar valores positivos e negativos
-                        transaction_match = re.search(r'^(.*?)\s+(-?\d{1,3}(?:\.\d{3})*(?:,\d{2}))$', line)
-                        if transaction_match:
-                            description, value = transaction_match.groups()
-                            # Converter valor para float
-                            value = float(value.replace('.', '').replace(',', '.'))
-
-                            transactions.append({
-                                'Data': current_date,
-                                'Descrição': description.strip(),
-                                'Valor': value
-                            })
+                    line = line.strip()
+                    
+                    # Verificar se é linha de transação
+                    transaction_match = transaction_pattern.match(line)
+                    if transaction_match:
+                        date, description, value = transaction_match.groups()
+                        # Converter valor para float
+                        value = float(value.replace('.', '').replace(',', '.'))
+                        
+                        transactions.append({
+                            'Data': date,
+                            'Descrição': description.strip(),
+                            'Valor': value
+                        })
+                    else:
+                        # Tratar linhas quebradas (como a transferência Pix de 2 linhas)
+                        if transactions and not re.match(r'\d{2}-\d{2}-\d{4}', line):
+                            # Adicionar à última descrição
+                            transactions[-1]['Descrição'] += ' ' + line.strip()
 
         logger.info(f"Extraídas {len(transactions)} transações do PDF")
         return transactions
