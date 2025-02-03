@@ -10,7 +10,10 @@ import logging
 from datetime import datetime
 
 # Configuração de logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Configuração do Flask
@@ -31,46 +34,77 @@ def allowed_file(filename):
 
 def extract_transactions_from_pdf(pdf_path):
     """
-    Extrai as transações do PDF do Mercado Pago.
+    Extrai as transações de todas as páginas do PDF do Mercado Pago.
     """
     transactions = []
     try:
         with pdfplumber.open(pdf_path) as pdf:
+            logger.info(f"PDF aberto com {len(pdf.pages)} páginas")
+
             for page in pdf.pages:
+                logger.info(f"Processando página {page.page_number}")
                 text = page.extract_text()
                 lines = text.split('\n')
+                logger.info(f"Encontradas {len(lines)} linhas na página {page.page_number}")
 
                 # Padrão para extrair transações
                 transaction_pattern = re.compile(
-                    r'(\d{2}-\d{2}-\d{4})\s+'  # Data
-                    r'(.*?)\s+'                 # Descrição
-                    r'(\d{11})\s+'              # ID da operação
-                    r'R\$\s*(-?\d+[.,]\d{2})'   # Valor
+                    r'(\d{2}-\d{2}-\d{4})\s+'    # Data
+                    r'(.*?)\s+'                   # Descrição
+                    r'(\d{11})\s+'                # ID da operação
+                    r'R\$\s*(-?[\d.,]+)'          # Valor (ajustado para capturar valores negativos)
                 )
 
                 for line in lines:
-                    # Pular cabeçalhos e rodapés
-                    if any(header in line for header in ['EXTRATO DE CONTA', 'DETALHE DOS MOVIMENTOS',
-                                                       'Data de geração:', 'Saldo inicial:', 'Saldo final:',
-                                                       'Data\s+Descrição\s+ID da operação\s+Valor\s+Saldo']):
+                    line = line.strip()
+
+                    # Pular linhas de cabeçalho e rodapé
+                    if any(header in line for header in [
+                        'EXTRATO DE CONTA',
+                        'DETALHE DOS MOVIMENTOS',
+                        'Data de geração:',
+                        'Saldo inicial:',
+                        'Saldo final:',
+                        'Data\s+Descrição',
+                        'Você tem alguma dúvida?',
+                        'Mercado Pago',
+                        '/3'  # Indicador de página
+                    ]):
                         continue
 
+                    # Tentar encontrar uma transação
                     match = transaction_pattern.search(line)
                     if match:
+                        logger.info(f"Transação encontrada: {line}")
                         date, description, operation_id, value = match.groups()
 
                         # Limpar e converter o valor
                         value = value.replace('.', '').replace(',', '.')
-                        value = float(value)
+                        try:
+                            value = float(value)
 
-                        transactions.append({
-                            'Data': date,
-                            'Descrição': description.strip(),
-                            'Valor': value
-                        })
+                            # Verificar se a transação já existe (evitar duplicatas)
+                            transaction = {
+                                'Data': date,
+                                'Descrição': description.strip(),
+                                'Valor': value
+                            }
 
-        logger.info(f"Extraídas {len(transactions)} transações do PDF")
+                            # Adicionar apenas se não for duplicata
+                            if transaction not in transactions:
+                                transactions.append(transaction)
+                                logger.info(f"Nova transação adicionada: {transaction}")
+
+                        except ValueError as e:
+                            logger.error(f"Erro ao converter valor: {value} - {str(e)}")
+                            continue
+
+        logger.info(f"Total de {len(transactions)} transações extraídas do PDF")
+
+        # Ordenar transações por data
+        transactions.sort(key=lambda x: datetime.strptime(x['Data'], '%d-%m-%Y'))
         return transactions
+
     except Exception as e:
         logger.error(f"Erro ao processar o PDF: {str(e)}")
         raise
@@ -146,6 +180,7 @@ def create_excel(transactions, excel_path):
 
         # Aplicar formatação
         format_excel(excel_path)
+        logger.info(f"Arquivo Excel criado com sucesso: {excel_path}")
         return True
     except Exception as e:
         logger.error(f"Erro ao criar arquivo Excel: {str(e)}")
